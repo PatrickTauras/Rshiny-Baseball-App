@@ -1,4 +1,4 @@
-# R Shiny Baseball App
+# R Shiny Baseball App (LINK IN THE ABOUT SECTION!!)
 
 ## Overview
 
