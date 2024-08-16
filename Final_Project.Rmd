@@ -1,0 +1,347 @@
+---
+title: "Final Project"
+author: "Patrick Tauras"
+date: "Due on 04/19/2023 at 11:59 pm"
+output: html_document
+urlcolor: blue
+runtime: shiny
+---
+Roy Mubarak, Marta Przybylska
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+**Instructions:** For this lab assignment you will create a R Shiny app. You are allowed to work on this lab assignment in groups. You still need to submit an individual lab report if you do work in a group, and you need to list your collaborators. Specific details and a basic grading rubric follow. 
+
+The app that you are going to create is largely up to you, but it should be closely related to materials that we covered in class. Some interesting ideas are: 
+
+ - You can create a Shiny app that displays seasonal stats for each player (or full time players) on a user-selected team and year. This app can also display basic team information such as aggregated seasonal scaled variables: \texttt{OPSscale = OPS/avgOPS}, \texttt{WHIPscale = avgWHIP/WHIP}, and \texttt{FPscale = FP/avgFP}.
+ 
+ - You can create a Shiny app that displays career trajectories for user-selected hitters and pitchers. You can add a widget that allows users to change which stats are displayed. This app can also display career values for the statistic that user selects.
+ 
+ - You can create a Shiny app that fits the Pythagorean formula model (after finding the optimal exponent) to the run-differential and win-loss data for a user-selected time period. The app can then display a top 10 list of managers who most overperformed their Pythagorean winning percentage and a top 10 list of managers who most underperformed their Pythagorean winning percentage over the user-selected time period.
+ 
+ - You can create a Shiny app that uses the \texttt{simulate\_half\_inning} function from the course notes to estimate a 2016 or 1968 team-specific RE24 matrix using Markov Chain simulation.
+ 
+ - You can create a Shiny app that displays annual averages of key pitching statcast variables, and computes the annual pitch type percentages for a user-selected pitcher. The graphic should allow one to clearly see how these annual averages change over time. 
+
+ - Something else that was covered in class.
+
+ - A pilot version of your potential final project
+
+Basic rubric details: 
+
+ - 10 points for all files submitted in the correct directory with the correct naming convention.
+ 
+ - 50 points for an app that successfully compiles from the materials in your directory.
+ 
+ - 10 points will be given for doing something interesting. Yes, this is subjective, but you can ask your instructor if what you are doing is interesting well before you submit your app. Any of the ideas mentioned above are interesting enough to earn these points.
+ 
+ - 15 points will be devoted to bugs. Your app should not break, time out, or display generic warnings/messages. Your app should not take too long to run. How long is too long is a bit subjective and app-specific. You can alleviate time concerns by displaying time warnings.
+ 
+ - 15 points will be devoted to presentation. Plots and inputs should have clear labels. If anything is not clear from these labels, then you need to provide additional clarifying text.
+
+
+Correct submission of a Shiny app that successfully compiles and displays something interesting at your defaults is automatically worth 70 points. Submission of a Shiny app that is not based on course material or closely related to course material will be deducted 50 points automatically. For example, a correct submission of the Old Faithful Shiny app would be worth 40 points (50 point deduction for submitting a Shiny app not related to course material; 10 point deduction for an app that only changes the number of bins in a histogram which is not interesting). 
+
+```{r}
+library(DT)
+library(shiny)
+library(Lahman)
+library(dplyr)
+library(ggplot2)
+library(shinythemes)
+```
+
+```{r}
+ui <- fluidPage(
+  theme = shinytheme("cerulean"),  # Using a Shiny theme as the base
+  tags$head(
+    tags$style(HTML("
+      body {
+        background-color: #FF8C1A; /* Light grey background */
+      }
+    "))
+  ),
+  titlePanel("Player Interface from 2010 - 2022"),
+  
+  
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("playerType", "Select Player Type:",
+                   choices = c("Pitcher" = "pitcher", "Batter" = "batter")),
+      
+      uiOutput("specificSliders")  # Dynamic UI for sliders
+    ),
+    
+    mainPanel(
+      DTOutput("playersTable"),  # Data table output
+      
+      conditionalPanel(
+        condition = "input.playerType == 'pitcher'",
+        plotOutput("plotSO"),
+        plotOutput("plotERA"),
+        plotOutput("plotWHIP"),
+        plotOutput("plotInnings"),
+        plotOutput("plotGS")
+      ),
+      conditionalPanel(
+        condition = "input.playerType == 'batter'",
+        plotOutput("plotHits"),
+        plotOutput("plotHomeRuns"),
+        plotOutput("plotRBIs"),
+        plotOutput("plotRuns"),
+        plotOutput("plotSteals")
+      )
+    )
+  )
+)
+
+```
+
+
+```{r}
+server <- function(input, output, session) {
+  output$specificSliders <- renderUI({
+    if (input$playerType == "pitcher") {
+      list(
+        sliderInput("yearRange", "Year Range",
+                    min = 2010, max = 2022,
+                    value = c(2010, 2019),
+                    step = 1),
+        sliderInput("strikeouts", "Strikeouts",
+                    min = 0, max = 300, value = c(50, 250)),
+        sliderInput("era", "Earned Run Average (ERA)",
+                    min = 0, max = 10, value = c(2, 5), step = 0.01),
+        sliderInput("whip", "Walks plus Hits per Inning Pitched (WHIP)",
+                    min = 0, max = 2, value = c(1, 1.5), step = 0.01),
+        sliderInput("innings", "Innings Pitched",
+                    min = 0, max = 300, value = c(50, 250)),
+        sliderInput("games", "Games Started",
+                    min = 0, max = 35, value = c(10, 30)),
+        sliderInput("hits", "Hits Allowed",
+                    min = 0, max = 300, value = c(50, 250))
+      )
+    } else {
+      list(
+        sliderInput("yearRange", "Year Range",
+                    min = 2010, max = 2022,
+                    value = c(2010, 2019),
+                    step = 1),
+        sliderInput("hits", "Hits",
+                    min = 0, max = 250, value = c(50, 200)),
+        sliderInput("homeRuns", "Home Runs",
+                    min = 0, max = 60, value = c(10, 50)),
+        sliderInput("rbis", "RBIs",
+                    min = 0, max = 130, value = c(30, 120)),
+        sliderInput("runs", "Runs",
+                    min = 0, max = 130, value = c(20, 120)),
+        sliderInput("steals", "Stolen Bases",
+                    min = 0, max = 70, value = c(5, 60))
+      )
+    }
+  })
+
+  # Calculate and append averages
+  append_average_row <- function(data) {
+    if (nrow(data) > 0) {
+      averages <- summarise(data, across(where(is.numeric), ~ round(mean(., na.rm = TRUE), 2)))
+      averages$nameFirst <- "Current Year"
+      averages$nameLast <- "Dataframe Average"
+      rbind(data, averages)
+    } else {
+      data
+    }
+  }
+
+  # Reactive expression for pitching data
+  pitching_stats <- reactive({
+    validate(
+      need(input$yearRange, "Waiting for year range input...")
+    )
+    
+    current_pitching_data <- Lahman::Pitching %>%
+      filter(yearID >= input$yearRange[1], yearID <= input$yearRange[2]) %>%
+      left_join(Lahman::People, by = "playerID") %>%
+      mutate(WHIP = round((H + BB) / (IPouts / 3), 2),
+             InningsPitched = IPouts / 3) %>%
+      filter(SO >= input$strikeouts[1], SO <= input$strikeouts[2],
+             ERA >= input$era[1], ERA <= input$era[2],
+             WHIP >= input$whip[1], WHIP <= input$whip[2],
+             InningsPitched >= input$innings[1], InningsPitched <= input$innings[2],
+             GS >= input$games[1], GS <= input$games[2],
+             H >= input$hits[1], H <= input$hits[2]) %>%
+      mutate(
+        SO_Norm = (SO - min(SO, na.rm = TRUE)) / (max(SO, na.rm = TRUE) - min(SO, na.rm = TRUE)),
+        WHIP_Norm = 1 - ((WHIP - min(WHIP, na.rm = TRUE)) / (max(WHIP, na.rm = TRUE) - min(WHIP, na.rm = TRUE))),
+        ERA_Norm = 1 - ((ERA - min(ERA, na.rm = TRUE)) / (max(ERA, na.rm = TRUE) - min(ERA, na.rm = TRUE))),
+        IP_Norm = (InningsPitched - min(InningsPitched, na.rm = TRUE)) / (max(InningsPitched, na.rm = TRUE) - min(InningsPitched, na.rm = TRUE)),
+        SER = 0.15 * SO_Norm + 0.15 * WHIP_Norm + 0.50 * ERA_Norm + 0.20 * IP_Norm
+      ) %>%
+      select(nameFirst, nameLast, yearID, SER, SO, ERA, WHIP, InningsPitched, GS, H) %>%
+      mutate(across(where(is.numeric), ~round(., 3))) %>%
+      arrange(desc(SER))
+
+    append_average_row(current_pitching_data)
+    
+  })
+
+  # Reactive expression for batting data
+  batting_stats <- reactive({
+    validate(
+      need(input$yearRange, "Waiting for year range input...")
+    )
+    
+    current_batting_data <- Lahman::Batting %>%
+    filter(yearID >= input$yearRange[1], yearID <= input$yearRange[2]) %>%
+    left_join(Lahman::People, by = "playerID") %>%
+    filter( 
+      AB > 0,
+      H >= input$hits[1], H <= input$hits[2],
+      HR >= input$homeRuns[1], HR <= input$homeRuns[2],
+      RBI >= input$rbis[1], RBI <= input$rbis[2],
+      R >= input$runs[1], R <= input$runs[2],
+      SB >= input$steals[1], SB <= input$steals[2]
+    ) %>%
+    mutate(
+      AVG = H / AB,  # Calculate the actual batting average
+      AVG_Norm = (AVG - min(AVG, na.rm = TRUE)) / (max(AVG, na.rm = TRUE) - min(AVG, na.rm = TRUE)),
+      HR_Norm = (HR - min(HR, na.rm = TRUE)) / (max(HR, na.rm = TRUE) - min(HR, na.rm = TRUE)),
+      R_Norm = (R - min(R, na.rm = TRUE)) / (max(R, na.rm = TRUE) - min(R, na.rm = TRUE)),
+      RBI_Norm = (RBI - min(RBI, na.rm = TRUE)) / (max(RBI, na.rm = TRUE) - min(RBI, na.rm = TRUE)),
+      SB_Norm = (SB - min(SB, na.rm = TRUE)) / (max(SB, na.rm = TRUE) - min(SB, na.rm = TRUE)),
+      SER = 0.17 * AVG_Norm + 0.25 * HR_Norm + 0.23 * R_Norm + 0.23 * RBI_Norm + 0.12 * SB_Norm
+    ) %>%
+    select(playerID, nameFirst, nameLast, yearID, SER, AVG, H, HR, RBI, R, SB) %>%
+      mutate(across(where(is.numeric), ~round(., 3))) %>%
+    arrange(desc(SER))
+
+  current_batting_data
+})
+
+  # Render the filtered data table
+  output$playersTable <- renderDT({
+    datatable(if (input$playerType == "pitcher") pitching_stats() else batting_stats(), options = list(pageLength = 25))
+  })
+# Reactive expression to fetch selected player's data
+  selected_player_data <- reactive({
+    req(input$playersTable_rows_selected)
+    selected_row <- input$playersTable_rows_selected
+    if (input$playerType == "pitcher") {
+      pitching_stats()[selected_row, ]
+    } else {
+      batting_stats()[selected_row, ]
+    }
+  })
+  
+  # Plot for Strikeouts
+  output$plotStrikeouts <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = SO)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Strikeouts over Years", x = "Year", y = "Strikeouts")
+  })
+
+  # Plot for ERA
+  output$plotERA <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = SO)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Strikeouts over Years", x = "Year", y = "Strikeouts")
+  })
+
+  # Plot for WHIP
+  output$plotWHIP <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = ERA)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "ERA over Years", x = "Year", y = "Earned Run Average")
+  })
+
+  # Plot for Innings Pitched
+  output$plotInningsPitched <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = InningsPitched)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Innings Pitched over Years", x = "Year", y = "Innings Pitched")
+  })
+
+  # Plot for Games Started
+  output$plotGamesStarted <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = GS)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Games Started over Years", x = "Year", y = "Games Started")
+  })
+  
+  
+  # Function to generate plots dynamically based on the selected player
+  output$plotHits <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = H)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Hits over Years", x = "Year", y = "Hits")
+  })
+
+  # Repeat the above plot generation for Home Runs, RBIs, Runs, and Stolen Bases
+  output$plotHomeRuns <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = HR)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Home Runs over Years", x = "Year", y = "Home Runs")
+  })
+
+  output$plotRBIs <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = RBI)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "RBIs over Years", x = "Year", y = "RBIs")
+  })
+
+  output$plotRuns <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = R)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Runs over Years", x = "Year", y = "Runs")
+  })
+
+  output$plotSteals <- renderPlot({
+    req(selected_player_data())
+    data <- selected_player_data()
+    ggplot(data, aes(x = yearID, y = SB)) + 
+      geom_line() + 
+      geom_point() +
+      labs(title = "Stolen Bases over Years", x = "Year", y = "Stolen Bases")
+  })
+}
+
+```
+
+
+
+```{r}
+
+shinyApp(ui = ui, server = server)
+
+```
+
