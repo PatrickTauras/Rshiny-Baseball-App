@@ -28,7 +28,13 @@ This project is an R Shiny application that allows users to explore baseball pla
 - **Home Runs**: Filter batters by the number of home runs hit, indicating power.
 - **RBIs (Runs Batted In)**: Filter batters by RBIs, showing how many runs they drove in.
 - **Runs**: Filter batters by the total number of runs they scored.
-- **Stolen Bases**: Filter by the number of bases a batter stole.
+- **Stolen Bases**: Filter by the number of bases a batter stole, indicating speed.
+
+## Selecting Individual Players and Comparing Performance
+
+- **Selecting Individual Players**: Use the search bar at the top right of the data table to type in a player's name. This will filter the table to show only the records of the selected player. You can select multiple records (e.g., different years) to compare the performance of the same player over time.
+
+- **Graphical Comparison**: After selecting the records of interest, the plots below the table will automatically update to reflect the selected data. You can visually compare how a player's statistics (such as hits, home runs, ERA, etc.) have changed over the years, or compare multiple players by selecting their records.
 
 ## Instructions
 
